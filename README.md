@@ -50,4 +50,4 @@
 - OpenWeather API (Weather data).  
 - Gemini AI (Chatbot AI).  
 
-Want me to format it in Markdown for GitHub? 😊
+

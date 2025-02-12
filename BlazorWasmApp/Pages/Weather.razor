@@ -1,0 +1,535 @@
+﻿@page "/weather"
+@inject WeatherService WeatherService
+@inject FavoriteService FavoriteService
+@inject ISnackbar Snackbar
+@inject ToasterService Toaster
+@inject AuthService AuthService
+@using BlazorWasmApp.Services
+@using BlazorWasmApp.Models
+@using MudBlazor
+<div class="animated-background">
+    <div class="weather-dashboard">
+        <div class="glass-container">
+            <div class="search-section">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input @bind="city"
+                           placeholder="Search for a city..."
+                           class="search-input"
+                           @onkeypress="@(e => e.Key == "Enter" ? GetWeather() : null)" />
+                </div>
+                <div class="action-button @(IsLoading ? "loading" : "")" @onclick="GetWeather">
+                    <span class="button-text">
+                        @if (IsLoading)
+                        {
+                            <div class="loader"></div>
+                        }
+                        else
+                        {
+                            <span>Discover Weather</span>
+                        }
+                    </span>
+                    <div class="button-background"></div>
+                </div>
+            </div>
+
+            @if (weather != null)
+            {
+                <div class="weather-card fade-in">
+                    <div class="weather-header">
+                        <div class="location">
+                            <h2>@weather.name, @weather.sys.country</h2>
+                            <p class="date">@DateTime.Now.ToString("dddd, MMMM dd")</p>
+                        </div>
+                        @if (IsLoggedIn)
+                        {
+                            <div class="favorite-button pulse" @onclick="AddToFavorites">
+                                <i class="fas fa-star"></i>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="weather-body">
+                        <div class="main-info">
+                            <div class="temperature">
+                                <span class="temp-value">@Math.Round(weather.main.temp)</span>
+                                <span class="temp-unit">°C</span>
+                            </div>
+                            <div class="condition">
+                                <i class="@GetWeatherIcon(weather.weather[0].main)"></i>
+                                <p>@weather.weather[0].description</p>
+                            </div>
+                        </div>
+
+                        @if (IsLoggedIn)
+                        {
+                            <div class="weather-details slide-in">
+                                <div class="detail-card">
+                                    <i class="fas fa-thermometer-half"></i>
+                                    <span>Feels like @Math.Round(weather.main.feels_like)°C</span>
+                                </div>
+                                <div class="detail-card">
+                                    <i class="fas fa-tint"></i>
+                                    <span>Humidity @weather.main.humidity%</span>
+                                </div>
+                                <div class="detail-card">
+                                    <i class="fas fa-wind"></i>
+                                    <span>Wind @weather.wind.speed m/s</span>
+                                </div>
+                                <div class="detail-card">
+                                    <i class="fas fa-sun"></i>
+                                    <span>Sunrise @ConvertUnixTime(weather.sys.sunrise)</span>
+                                </div>
+                                <div class="detail-card">
+                                    <i class="fas fa-moon"></i>
+                                    <span>Sunset @ConvertUnixTime(weather.sys.sunset)</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (weather.weather[0].main == "Rain")
+                    {
+                        <div class="rain-alert bounce" @onclick="SendRainNotification">
+                            <i class="fas fa-cloud-rain"></i>
+                            <span>Rain Alert</span>
+                        </div>
+                    }
+                </div>
+
+                @if (IsLoggedIn)
+                {
+                    <div class="forecast-toggle @(ShowForecast ? "active" : "")" @onclick="GetForecast">
+                        <span>5-Day Forecast</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                }
+            }
+
+            @if (forecast != null && ShowForecast)
+            {
+                <div class="forecast-section slide-up">
+                    <div class="forecast-grid">
+                        @foreach (var item in forecast.list)
+                        {
+                            <div class="forecast-card">
+                                <p class="forecast-date">@DateTime.Parse(item.dt_txt).ToString("ddd, HH:mm")</p>
+                                <i class="@GetWeatherIcon(item.weather[0].main)"></i>
+                                <p class="forecast-temp">@Math.Round(item.main.temp)°C</p>
+                                <p class="forecast-desc">@item.weather[0].description</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string city = "";
+    private WeatherResponse? weather;
+    private ForecastResponse? forecast;
+    private bool IsLoading = false;
+    private bool ShowForecast = false;
+    private bool IsLoggedIn = false;
+    private int searchCount = 0;
+    private const int MaxSearchLimit = 5;
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoggedIn = await AuthService.IsUserLoggedIn();
+    }
+
+    private async Task GetWeather()
+    {
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            Snackbar.Add("Please enter a city name!", Severity.Warning);
+            await Toaster.ShowToast("Please enter a city name!", "warning");
+            return;
+        }
+
+        if (!IsLoggedIn && searchCount >= MaxSearchLimit)
+        {
+            Snackbar.Add("Search limit reached! Please log in for unlimited searches.", Severity.Error);
+            await Toaster.ShowToast("Search limit reached! Please log in for unlimited searches.", "error");
+            return;
+        }
+
+        IsLoading = true;
+        StateHasChanged();
+
+        weather = await WeatherService.GetWeatherAsync(city);
+        IsLoading = false;
+
+        if (weather != null)
+        {
+            Snackbar.Add($"Weather data retrieved for {city}", Severity.Info);
+            await Toaster.ShowToast($"Weather data retrieved for {city}", "success");
+            searchCount++;
+        }
+        else
+        {
+            Snackbar.Add("City not found or API error!", Severity.Error);
+            await Toaster.ShowToast("City not found or API error!", "error");
+        }
+    }
+
+    private async Task GetForecast()
+    {
+        if (!IsLoggedIn)
+        {
+            Snackbar.Add("Log in to view the 5-day forecast!", Severity.Warning);
+            await Toaster.ShowToast("Log in to view the 5-day forecast!", "warning");
+            return;
+        }
+
+        if (weather == null)
+        {
+            Snackbar.Add("Get current weather first!", Severity.Warning);
+            return;
+        }
+
+        IsLoading = true;
+        StateHasChanged();
+
+        forecast = await WeatherService.GetFiveDayForecastAsync(city);
+        IsLoading = false;
+        ShowForecast = true;
+
+        if (forecast != null)
+        {
+            Snackbar.Add("5-Day Forecast retrieved!", Severity.Info);
+            await Toaster.ShowToast("5-Day Forecast retrieved!", "success");
+        }
+        else
+        {
+            Snackbar.Add("Could not fetch forecast!", Severity.Error);
+            await Toaster.ShowToast("Could not fetch forecast!", "error");
+        }
+    }
+
+    private void CloseForecast()
+    {
+        ShowForecast = false;
+    }
+
+    private async Task AddToFavorites()
+    {
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            bool added = await FavoriteService.AddFavoriteCityAsync(city);
+
+            if (added)
+            {
+                Snackbar.Add($"{city} added to favorites!", Severity.Success);
+                await Toaster.ShowToast($"{city} added to favorites!", "success");
+            }
+            else
+            {
+                Snackbar.Add($"{city} is already in your favorites.", Severity.Warning);
+                await Toaster.ShowToast($"{city} is already in your favorites.", "warning");
+            }
+        }
+    }
+
+    private async Task SendRainNotification()
+    {
+        if (weather != null)
+        {
+            await WeatherService.SendRainNotificationEmailAsync("user@example.com", city, weather.weather[0].description);
+            Snackbar.Add("Rain alert sent successfully!", Severity.Success);
+            await Toaster.ShowToast("Rain alert sent successfully!", "success");
+        }
+    }
+
+    private string ConvertUnixTime(int unixTime)
+    {
+        return DateTimeOffset.FromUnixTimeSeconds(unixTime).ToLocalTime().ToString("HH:mm");
+    }
+
+    private string GetWeatherIcon(string condition)
+    {
+        return condition.ToLower() switch
+        {
+            "clear" => "fas fa-sun",
+            "clouds" => "fas fa-cloud",
+            "rain" => "fas fa-cloud-rain",
+            "snow" => "fas fa-snowflake",
+            "thunderstorm" => "fas fa-bolt",
+            "drizzle" => "fas fa-cloud-rain",
+            "mist" or "fog" => "fas fa-smog",
+            _ => "fas fa-cloud"
+        };
+    }
+}<style>
+    .animated-background {
+        min-height: 100vh;
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+        
+    }
+
+    @@keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .weather-dashboard {
+        max-width: 900px;
+        margin: 0 auto;
+        padding-top:30px;
+    }
+
+    .glass-container {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 24px;
+        padding: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        padding-top:50px;
+    }
+
+    .search-section {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .search-container {
+        flex: 1;
+        position: relative;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 1.2rem 1.2rem 1.2rem 3rem;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 16px;
+        font-size: 1.1rem;
+        color: white;
+        transition: all 0.3s ease;
+    }
+
+    .search-input::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .search-input:focus {
+        background: rgba(255, 255, 255, 0.3);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: white;
+    }
+
+    .action-button {
+        position: relative;
+        padding: 1rem 2rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+        overflow: hidden;
+        border-radius: 16px;
+    }
+
+    .button-text {
+        position: relative;
+        z-index: 1;
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .button-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        opacity: 0.8;
+        transition: transform 0.3s ease;
+    }
+
+    .action-button:hover .button-background {
+        transform: scale(1.1);
+    }
+
+    .weather-card {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 2rem 0;
+        color: white;
+    }
+
+    .detail-card {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 1rem;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.3s ease;
+    }
+
+    .detail-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.25);
+    }
+
+    .forecast-card {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        color: white;
+        transition: all 0.3s ease;
+    }
+
+    .forecast-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.25);
+    }
+
+    .rain-alert {
+        background: linear-gradient(45deg, #4A90E2, #67B26F);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.8rem;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .rain-alert:hover {
+        transform: translateY(-3px);
+    }
+
+    .forecast-toggle {
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin: 1rem 0;
+    }
+
+    .forecast-toggle:hover {
+        transform: translateY(-3px);
+    }
+
+    .forecast-toggle i {
+        margin-left: 0.5rem;
+        transition: transform 0.3s ease;
+    }
+
+    .forecast-toggle.active i {
+        transform: rotate(180deg);
+    }
+
+    /* Enhanced Animations */
+    .pulse {
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    .fade-in {
+        animation: fadeIn 0.8s ease-out;
+    }
+
+   @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-in {
+        animation: slideIn 0.8s ease-out;
+    }
+
+    @@keyframes slideIn {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    .bounce {
+        animation: bounce 1s infinite;
+    }
+
+    @@keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .search-section {
+            flex-direction: column;
+        }
+
+        .weather-details {
+            grid-template-columns: 1fr;
+        }
+
+        .forecast-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .weather-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .temperature {
+        font-size: 5rem;
+        font-weight: bold;
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .condition i {
+        font-size: 3.5rem;
+        margin-bottom: 1rem;
+        color: #FFD700;
+    }
+
+    .loader {
+        width: 24px;
+        height: 24px;
+        border: 3px solid #ffffff;
+        border-top: 3px solid transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>

@@ -1,0 +1,286 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject AuthService AuthService
+
+<PageTitle>BlazorWasmApp</PageTitle>
+
+<div class="app-container">
+    <header class="app-header">
+        <div class="logo">
+            <span class="icon">🌤️</span>
+            <h1>BlazorWasmApp</h1>
+        </div>
+        <div class="auth-section">
+            @if (IsAuthenticated)
+            {
+                <div class="user-menu">
+                    <div class="user-profile">
+                        <span class="avatar">👤</span>
+                        <span class="user-email">@UserEmail</span>
+                    </div>
+                    <button @onclick="Logout" class="logout-btn">
+                        <span class="btn-icon">🚪</span>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            }
+            else
+            {
+                <button @onclick="GoToLogin" class="login-btn">
+                    <span class="btn-icon">🔐</span>
+                    <span>Login</span>
+                </button>
+            }
+        </div>
+    </header>
+
+    <div class="page-layout">
+        <aside class="sidebar">
+            <NavMenu />
+        </aside>
+        <main class="content">
+            <div class="content-wrapper">
+                @Body
+            </div>
+        </main>
+    </div>
+</div>
+
+@code {
+    private bool IsAuthenticated = false;
+    private string UserEmail = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthService.OnAuthStateChanged += AuthStateChanged;
+        await LoadUser();
+    }
+
+    private async Task LoadUser()
+    {
+        IsAuthenticated = await AuthService.IsUserLoggedIn();
+        UserEmail = IsAuthenticated ? (await AuthService.GetUserEmailAsync() ?? "Unknown User") : string.Empty;
+        StateHasChanged();
+    }
+
+    private void AuthStateChanged()
+    {
+        InvokeAsync(LoadUser);
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private void GoToLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= AuthStateChanged;
+    }
+}
+
+<style>
+    .app-container {
+        min-height: 100vh;
+        background-color: #f8f9fa;
+    }
+
+    /* Header Styling */
+    .app-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+        color: white;
+        padding: 16px 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        backdrop-filter: blur(10px);
+    }
+
+    /* Logo Section */
+    .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .logo .icon {
+        font-size: 32px;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .logo h1 {
+        font-size: 24px;
+        font-weight: 700;
+        background: linear-gradient(to right, #fff, #e0e0e0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+    }
+
+    /* Authentication Section */
+    .auth-section {
+        display: flex;
+        align-items: center;
+    }
+
+    .user-menu {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.15);
+        padding: 8px 16px;
+        border-radius: 50px;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+
+    .user-profile:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+    }
+
+    .avatar {
+        font-size: 20px;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .user-email {
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    /* Buttons */
+    .login-btn, .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: white;
+    }
+
+    .login-btn {
+        background: linear-gradient(135deg, #00b09b, #96c93d);
+        box-shadow: 0 4px 15px rgba(0, 176, 155, 0.2);
+    }
+
+    .logout-btn {
+        background: linear-gradient(135deg, #ff9966, #ff5e62);
+        box-shadow: 0 4px 15px rgba(255, 94, 98, 0.2);
+    }
+
+    .login-btn:hover, .logout-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-icon {
+        font-size: 16px;
+    }
+
+    /* Layout */
+    .page-layout {
+        display: flex;
+        min-height: calc(100vh - 70px);
+    }
+
+    .sidebar {
+        width: 280px;
+        background: white;
+        box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05);
+        padding: 24px;
+        transition: all 0.3s ease;
+    }
+
+    .content {
+        flex: 1;
+       
+    }
+
+    .content-wrapper {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        
+        min-height: calc(100vh - 118px);
+    }
+
+    /* Animations */
+    @@keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+
+    @@keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .page-layout {
+            flex-direction: column;
+        }
+
+        .sidebar {
+            width: 100%;
+            padding: 16px;
+        }
+
+        .content {
+            padding: 16px;
+        }
+
+        .user-email {
+            display: none;
+        }
+
+        .logo h1 {
+            font-size: 20px;
+        }
+    }
+
+    /* Smooth Scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #2193b0;
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #6dd5ed;
+    }
+</style>

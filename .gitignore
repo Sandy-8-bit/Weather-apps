@@ -1,0 +1,7 @@
+# Ignore Visual Studio temporary files
+.vs/
+*.vscode/
+*.user
+*.userosscache
+*.suo
+*.userprefs

@@ -1,0 +1,502 @@
+﻿@page "/"
+@inject FavoriteService FavoriteService
+@inject WeatherService WeatherService
+@using BlazorWasmApp.Models
+@using BlazorWasmApp.Services
+@inject ToasterService Toaster
+
+<div class="home-container">
+    <div class="background-animation"></div>
+    <h1 class="home-header">Weather Dashboard</h1>
+
+    @if (IsLoading)
+    {
+        <div class="loader-container">
+            <div class="pulse-loader"></div>
+            <p>Fetching weather data...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(HomeCity))
+    {
+        <div class="weather-card">
+            <div class="location-header">
+                <div class="location-icon">📍</div>
+                <h2>@HomeCity</h2>
+            </div>
+
+            @if (weather != null)
+            {
+                <div class="weather-content">
+                    <div class="weather-main">
+                        <div class="temperature">
+                            <span class="temp-value">@weather.main.temp°</span>
+                            <span class="temp-unit">C</span>
+                        </div>
+                        <div class="condition">
+                            <span class="condition-icon">@GetWeatherIcon(weather.weather[0].description)</span>
+                            <span class="condition-text">@weather.weather[0].description</span>
+                        </div>
+                    </div>
+
+                    <div class="weather-details">
+                        <div class="detail-item">
+                            <i class="wind-icon">💨</i>
+                            <div class="detail-info">
+                                <span class="detail-value">@weather.wind.speed</span>
+                                <span class="detail-label">m/s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="error-container">
+                    <span class="error-icon">⚠️</span>
+                    <p>Weather data unavailable</p>
+                </div>
+            }
+
+            <button @onclick="RemoveHomeCity" class="action-button">
+                <span class="button-icon">🗑️</span>
+                <span>Remove City</span>
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="login-card">
+            <span class="login-icon">🔐</span>
+            <p>Please login to set your home city</p>
+        </div>
+    }
+</div>
+
+<!-- Floating Chat Buttons -->
+<button class="chat-button gemini-button" @onclick="ToggleGemini">
+    💬 Gemini
+</button>
+<button class="chat-button ai-button" @onclick="ToggleChat">
+    💬 AI Chat
+</button>
+
+<!-- Chat Popup -->
+@if (IsChatOpen)
+{
+    <div class="chat-popup">
+        <div class="chat-header">
+            <span>AI Chat</span>
+            <button class="close-button" @onclick="ToggleChat">×</button>
+        </div>
+        <iframe src="/chatbot" class="chat-frame"></iframe>
+    </div>
+}
+
+<!-- Gemini Chat Popup -->
+@if (IsGeminiChatOpen)
+{
+    <div class="chat-popup">
+        <div class="chat-header">
+            <span>Gemini Chat</span>
+            <button class="close-button" @onclick="ToggleGemini">×</button>
+        </div>
+        <iframe src="/geminichat" class="chat-frame"></iframe>
+    </div>
+}
+
+<style>
+    /* Chat Button */
+    .chat-button {
+        position: fixed;
+        right: 20px;
+        width: 100px; /* Adjusted width for better text fit */
+        height: 60px;
+        background: #FF6B6B;
+        color: white;
+        border: none;
+        border-radius: 30px; /* Rounded corners */
+        font-size: 1em;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+    }
+
+        .chat-button:hover {
+            transform: scale(1.1);
+        }
+
+    /* Position the AI Chat button */
+    .ai-button {
+        bottom: 20px;
+    }
+
+    /* Position the Gemini Chat button above the AI Chat button */
+    .gemini-button {
+        bottom: 20px; /* Adjusted to avoid overlap */
+        right:130px;
+    }
+
+    /* Chat Popup */
+    .chat-popup {
+        position: fixed;
+        bottom: 100px;
+        right: 20px;
+        width: 400px;
+        height: 530px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        z-index: 999;
+        animation: fadeInUp 0.3s ease-out;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #FF6B6B;
+        color: white;
+        padding: 10px 15px;
+        font-size: 1.2em;
+    }
+
+    .close-button {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5em;
+        cursor: pointer;
+    }
+
+    .chat-frame {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
+    /* Global Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Home Container */
+.home-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    overflow: hidden;
+}
+
+/* Background Animation */
+.background-animation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fbc2eb, #a6c1ee, #f6d365);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+    z-index: -1;
+}
+
+@@keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Home Header */
+.home-header {
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Loader Container */
+.loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.pulse-loader {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #3498db;
+    animation: pulse 1.5s infinite;
+}
+
+@@keyframes pulse {
+    0% { transform: scale(0.8); opacity: 0.7; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.8); opacity: 0.7; }
+}
+
+.loader-container p {
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+/* Weather Card */
+.weather-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.location-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.location-icon {
+    font-size: 1.5rem;
+}
+
+.location-header h2 {
+    font-size: 1.8rem;
+    color: #2c3e50;
+}
+
+.weather-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.weather-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.temperature {
+    font-size: 2.5rem;
+    color: #3498db;
+    display: flex;
+    align-items: baseline;
+}
+
+.temp-value {
+    font-weight: bold;
+}
+
+.temp-unit {
+    font-size: 1.5rem;
+    color: #7f8c8d;
+}
+
+.condition {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.condition-icon {
+    font-size: 2rem;
+}
+
+.condition-text {
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+.weather-details {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wind-icon {
+    font-size: 1.5rem;
+}
+
+.detail-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.detail-value {
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+.detail-label {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+/* Error Container */
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.error-icon {
+    font-size: 2rem;
+    color: #e74c3c;
+}
+
+.error-container p {
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+/* Login Card */
+.login-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-icon {
+    font-size: 2rem;
+    color: #3498db;
+}
+
+.login-card p {
+    font-size: 1.2rem;
+    color: #2c3e50;
+    margin-top: 10px;
+}
+
+/* Action Button */
+.action-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background 0.3s ease;
+}
+
+.action-button:hover {
+    background: #c0392b;
+}
+
+.button-icon {
+    font-size: 1.2rem;
+}
+</style>
+
+@code {
+    private string HomeCity = string.Empty;
+    private WeatherResponse? weather;
+    private bool IsLoading = true;
+    private bool IsChatOpen = false;
+    private bool IsGeminiChatOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHomeCity();
+    }
+
+    private async Task LoadHomeCity()
+    {
+        IsLoading = true;
+        var homeCityData = await FavoriteService.GetHomeCityAsync();
+        if (homeCityData != null)
+        {
+            HomeCity = homeCityData.CityName;
+            weather = await WeatherService.GetWeatherAsync(HomeCity);
+        }
+        IsLoading = false;
+    }
+
+    private async Task RemoveHomeCity()
+    {
+        if (!string.IsNullOrEmpty(HomeCity))
+        {
+            await FavoriteService.RemoveFavoriteCityAsync(HomeCity);
+            HomeCity = string.Empty;
+            weather = null;
+            await Toaster.ShowToast("Home city removed successfully", "success");
+        }
+    }
+
+    private void ToggleChat()
+    {
+        IsChatOpen = !IsChatOpen;
+    }
+
+    private void ToggleGemini()
+    {
+        IsGeminiChatOpen = !IsGeminiChatOpen;
+    }
+
+    private string GetWeatherIcon(string description)
+    {
+        return description.ToLower() switch
+        {
+            var d when d.Contains("clear") => "☀️",
+            var d when d.Contains("cloud") => "☁️",
+            var d when d.Contains("rain") => "🌧️",
+            var d when d.Contains("snow") => "❄️",
+            var d when d.Contains("thunder") => "⛈️",
+            var d when d.Contains("mist") || d.Contains("fog") => "🌫️",
+            _ => "🌤️"
+        };
+    }
+}

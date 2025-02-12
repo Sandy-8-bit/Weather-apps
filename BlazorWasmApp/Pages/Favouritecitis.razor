@@ -1,0 +1,432 @@
+﻿@page "/favorites"
+@using BlazorWasmApp.Models
+@inject FavoriteService FavoriteService
+@inject ToasterService Toaster
+
+<div class="favorites-container">
+    <div class="background-gradient"></div>
+    <h1 class="favorites-header">My Favorite Cities</h1>
+
+    @if (IsLoading)
+    {
+        <div class="loader-container">
+            <div class="pulse-loader"></div>
+            <p>Loading your cities...</p>
+        </div>
+    }
+    else
+    {
+        <div class="content-card">
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <span class="input-icon">🔍</span>
+                    <input @bind="NewCity" 
+                           placeholder="Add a new city..." 
+                           class="input-field" />
+                </div>
+                <button @onclick="AddFavoriteCity" class="add-button">
+                    <span class="button-icon">+</span>
+                    <span>Add City</span>
+                </button>
+            </div>
+
+            <div class="favorites-list">
+                @foreach (var city in FavoriteCities)
+                {
+                    <div class="favorite-card">
+                        <div class="city-info">
+                            <span class="city-icon">🌆</span>
+                            <span class="city-name">@city.CityName</span>
+                            @if (city.IsHomeCity)
+                            {
+                                <span class="home-badge">Home City</span>
+                            }
+                        </div>
+                        <div class="action-buttons">
+                            <button @onclick="() => SetHomeCity(city.CityName!)" 
+                                    class="action-btn home-btn" 
+                                    title="Set as home city">
+                                <span>🏠</span>
+                            </button>
+                            <button @onclick="() => RemoveFavorite(city.CityName!)" 
+                                    class="action-btn remove-btn" 
+                                    title="Remove from favorites">
+                                <span>✖</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+                @if (!FavoriteCities.Any())
+                {
+                    <div class="empty-state">
+                        <span class="empty-icon">📍</span>
+                        <p>No favorite cities yet. Add some above!</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<FavoriteCity> FavoriteCities { get; set; } = new();
+    private string NewCity { get; set; } = string.Empty;
+    private bool IsLoading { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFavorites();
+    }
+
+    private async Task LoadFavorites()
+    {
+        try
+        {
+            IsLoading = true;
+            FavoriteCities = await FavoriteService.GetFavoritesAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toaster.ShowToast($"Error loading favorites: {ex.Message}", "error");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task AddFavoriteCity()
+    {
+        if (string.IsNullOrWhiteSpace(NewCity))
+        {
+            await Toaster.ShowToast("Please enter a city name", "warning");
+            return;
+        }
+
+        try
+        {
+            if (await FavoriteService.AddFavoriteCityAsync(NewCity))
+            {
+                await LoadFavorites();
+                NewCity = string.Empty;
+                await Toaster.ShowToast("City added successfully", "success");
+            }
+        }
+        catch (Exception ex)
+        {
+            await Toaster.ShowToast($"Error adding city: {ex.Message}", "error");
+        }
+    }
+
+    private async Task RemoveFavorite(string city)
+    {
+        try
+        {
+            if (await FavoriteService.RemoveFavoriteCityAsync(city))
+            {
+                await LoadFavorites();
+                await Toaster.ShowToast("City removed successfully", "success");
+            }
+        }
+        catch (Exception ex)
+        {
+            await Toaster.ShowToast($"Error removing city: {ex.Message}", "error");
+        }
+    }
+
+    private async Task SetHomeCity(string city)
+    {
+        try
+        {
+            if (await FavoriteService.SetHomeCityAsync(city))
+            {
+                await LoadFavorites();
+                await Toaster.ShowToast("Home city set successfully", "success");
+            }
+        }
+        catch (Exception ex)
+        {
+            await Toaster.ShowToast($"Error setting home city: {ex.Message}", "error");
+        }
+    }
+}
+<style>
+    .favorites-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 30px;
+        position: relative;
+        min-height: 600px;
+    }
+
+    .background-gradient {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, #6C63FF, #FF6584, #4ECDC4);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+        z-index: -1;
+    }
+
+    .favorites-header {
+        color: white;
+        font-size: 2.5em;
+        text-align: center;
+        margin-bottom: 40px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        animation: slideDown 0.8s ease-out;
+    }
+
+    .content-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        animation: fadeIn 0.8s ease-out;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .input-wrapper {
+        flex: 1;
+        position: relative;
+        animation: slideRight 0.5s ease-out;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.2em;
+        color: #666;
+    }
+
+    .input-field {
+        width: 100%;
+        padding: 15px 15px 15px 45px;
+        border: 2px solid #e1e1e1;
+        border-radius: 12px;
+        font-size: 1em;
+        transition: all 0.3s ease;
+    }
+
+    .input-field:focus {
+        border-color: #6C63FF;
+        box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.2);
+        outline: none;
+    }
+
+    .add-button {
+        padding: 0 25px;
+        background: linear-gradient(45deg, #6C63FF, #8F87FF);
+        border: none;
+        border-radius: 12px;
+        color: white;
+        font-size: 1em;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        animation: slideLeft 0.5s ease-out;
+    }
+
+    .add-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(108, 99, 255, 0.4);
+    }
+
+    .button-icon {
+        font-size: 1.2em;
+    }
+
+    .favorites-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .favorite-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        animation: slideUp 0.5s ease-out;
+    }
+
+    .favorite-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .city-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .city-icon {
+        font-size: 1.5em;
+    }
+
+    .city-name {
+        font-size: 1.1em;
+        font-weight: 500;
+    }
+
+    .home-badge {
+        background: linear-gradient(45deg, #4ECDC4, #2ECC71);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.8em;
+        animation: pulse 2s infinite;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+    }
+
+    .action-btn {
+        width: 40px;
+        height: 40px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2em;
+    }
+
+    .home-btn {
+        background: linear-gradient(45deg, #FFC107, #FFD54F);
+        color: white;
+    }
+
+    .remove-btn {
+        background: linear-gradient(45deg, #FF6B6B, #FF8E8E);
+        color: white;
+    }
+
+    .action-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+
+    .empty-icon {
+        font-size: 3em;
+        margin-bottom: 15px;
+        display: block;
+    }
+
+    .loader-container {
+        text-align: center;
+        padding: 50px;
+        color: white;
+    }
+
+    .pulse-loader {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 20px;
+        border-radius: 50%;
+        background: white;
+        animation: pulse 1.5s infinite;
+    }
+
+    /* Animations */
+    @@keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @@keyframes slideDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @@keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @@keyframes slideRight {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @@keyframes slideLeft {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @@keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .favorites-container {
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .favorites-header {
+            font-size: 2em;
+        }
+
+        .input-group {
+            flex-direction: column;
+        }
+
+        .add-button {
+            padding: 15px;
+            justify-content: center;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .favorite-card {
+            flex-direction: column;
+            gap: 15px;
+            text-align: center;
+        }
+
+        .city-info {
+            flex-direction: column;
+        }
+
+        .action-buttons {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>

@@ -20,7 +20,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorWasm",
-        policy => policy.WithOrigins("http://localhost:8080") // Your Blazor WASM URL
+        policy => policy.WithOrigins("https://weather-apps-5.onrender.com") // Your Blazor WASM URL
                         .AllowAnyMethod()
                         .AllowAnyHeader()
      

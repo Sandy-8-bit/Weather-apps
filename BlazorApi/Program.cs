@@ -20,9 +20,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorWasm",
-        policy => policy.WithOrigins("http://localhost:5162") // Your Blazor WASM URL
+        policy => policy.WithOrigins("http://localhost:8080") // Your Blazor WASM URL
                         .AllowAnyMethod()
                         .AllowAnyHeader()
+     
                         .AllowCredentials());
 });
 

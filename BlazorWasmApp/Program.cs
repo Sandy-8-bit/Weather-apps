@@ -19,7 +19,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Add HttpClient with the backend API base URL
 builder.Services.AddScoped(sp => new HttpClient
 {
-    BaseAddress = new Uri("https://localhost:7052"), // API base URL
+    BaseAddress = new Uri("https://localhost:8081"), // API base URL
     DefaultRequestHeaders = { { "Accept", "application/json" } }
 });
 
